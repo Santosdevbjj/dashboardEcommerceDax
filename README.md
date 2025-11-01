@@ -49,11 +49,11 @@ O projeto está totalmente documentado e preparado para ser exibido no GitHub co
 
 ---
 
-🎯 Objetivo Técnico
+🎯 **Objetivo Técnico**
 
 Modelar o conjunto de dados Financial Sample para obter um modelo de dados analítico otimizado, criando tabelas dimensão e fato e aplicando medidas DAX para calcular métricas como:
 
-Total de Vendas
+**Total de Vendas**
 
 Quantidade de Unidades Vendidas
 
@@ -76,7 +76,7 @@ O modelo segue o padrão Star Schema (Esquema em Estrela):
 
 ---
 
-Tabelas criadas:
+**Tabelas criadas:**
 
 Tipo	Nome da Tabela	Descrição
 
@@ -91,7 +91,7 @@ Fato	F_Vendas	Fato consolidado de vendas e lucros
 
 ---
 
-⚙️ Etapas de Construção
+⚙️ **Etapas de Construção**
 
 1. Importação e backup da base
 
@@ -101,7 +101,7 @@ Renomear consulta para Financials_origem e ocultar no modelo.
 
 
 
-2. Limpeza e transformação (Power Query)
+**2. Limpeza e transformação (Power Query)**
 
 Padronizar tipos de dados.
 
@@ -111,7 +111,7 @@ Normalizar nomes de colunas.
 
 
 
-3. Criação das tabelas dimensão e fato (DAX / Power Query)
+**3. Criação das tabelas dimensão e fato (DAX / Power Query)**
 
 Usar SUMMARIZE e ADDCOLUMNS para construir tabelas agregadas.
 
@@ -119,7 +119,7 @@ Criar D_Calendario com CALENDAR() entre o menor e o maior valor de data.
 
 
 
-4. Modelagem relacional
+**4. Modelagem relacional**
 
 Relacionar F_Vendas às dimensões.
 
@@ -127,7 +127,7 @@ Verificar cardinalidades e direções de filtro.
 
 
 
-5. Criação das medidas DAX
+**5. Criação das medidas DAX**
 
 Implementar cálculos de vendas, lucro e margem.
 
@@ -135,7 +135,7 @@ Criar índices e classificações com SWITCH, RANKX, IF.
 
 
 
-6. Design do Dashboard
+**6. Design do Dashboard**
 
 Página 1: Visão Geral (KPIs)
 
@@ -151,16 +151,16 @@ Página 4: Tabela de Detalhes (Filtros Interativos)
 
 ---
 
-🧠 Principais Fórmulas DAX Utilizadas
+🧠 **Principais Fórmulas DAX Utilizadas**
 
 Consulte o arquivo completo: /docs/dax_formulas.md
 
-Exemplo de medida:
+**Exemplo de medida:**
 
 Total Sales = 
 SUMX(F_Vendas, F_Vendas[SalesPrice] * F_Vendas[UnitsSold])
 
-Exemplo de tabela calculada:
+**Exemplo de tabela calculada:**
 
 D_Calendario =
 ADDCOLUMNS(
@@ -173,9 +173,9 @@ ADDCOLUMNS(
 
 ---
 
-🧰 Tecnologias e Ferramentas
+🧰 **Tecnologias e Ferramentas**
 
-Tecnologia	Uso
+**Tecnologia	Uso**
 
 Power BI Desktop	Modelagem de dados e criação de relatórios
 Power Query (M)	ETL — limpeza e transformação de dados
@@ -186,9 +186,9 @@ Git / GitHub	Versionamento e documentação do projeto
 
 ---
 
-💻 Requisitos de Sistema
+💻 **Requisitos de Sistema**
 
-Software:
+**Software:**
 
 Power BI Desktop (versão 2023 ou superior)
 
@@ -197,7 +197,7 @@ Windows 10/11
 Git (para versionamento)
 
 
-Hardware recomendado:
+**Hardware recomendado:**
 
 CPU: Intel i5 ou superior
 
@@ -209,7 +209,7 @@ Armazenamento: 10 GB livres
 
 ---
 
-📊 Resultados Esperados
+📊 **Resultados Esperados**
 
 Modelo relacional limpo, otimizado e documentado.
 
@@ -223,16 +223,7 @@ README estruturado para atrair recrutadores e avaliadores técnicos.
 
 ---
 
-✍️ Autor
 
-Sérgio Santos
-Analista de Sistemas e Desenvolvedor Power BI
-📧 LinkedIn • 💻 GitHub: Santosdevbjj
-
-
----
-
----
 
 ## 📘 **(2) `/docs/dax_formulas.md` — todas as fórmulas DAX completas e comentadas**
 
