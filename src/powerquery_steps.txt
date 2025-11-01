@@ -1,0 +1,200 @@
+# ================================================================
+# Power Query (M) — Dashboard E-commerce com Power BI + DAX
+# Autor: Sérgio Santos
+# Projeto: Modelagem Star Schema com Financial Sample
+# Repositório: https://github.com/Santosdevbjj/dashboardEcommerceDax
+# ================================================================
+# Descrição:
+# Este arquivo reúne todos os códigos M (Power Query) utilizados para
+# limpeza, transformação e criação das tabelas:
+# Financials_origem, F_Vendas, D_Produtos, D_Produtos_Detalhes,
+# D_Descontos e D_Detalhes.
+# ================================================================
+
+
+# ================================================================
+# 1️⃣ Financials_origem — Importação e limpeza inicial
+# ================================================================
+
+let
+    Source = Csv.Document(
+        File.Contents("C:\data\financial_sample.csv"),
+        [Delimiter = ",", Columns = 20, Encoding = 1252, QuoteStyle = QuoteStyle.Csv]
+    ),
+    PromotedHeaders = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
+    ChangedTypes = Table.TransformColumnTypes(PromotedHeaders, {
+        {"SK_ID", Int64.Type},
+        {"ID_produto", type text},
+        {"Produto", type text},
+        {"Units Sold", Int64.Type},
+        {"Sales Price", type number},
+        {"Manufacturing Price", type number},
+        {"Discount", type number},
+        {"Discount Band", type text},
+        {"Segment", type text},
+        {"Country", type text},
+        {"Saler", type text},
+        {"Profit", type number},
+        {"Date", type date}
+    }),
+    ReplaceNulls = Table.ReplaceValue(
+        ChangedTypes, null, 0, Replacer.ReplaceValue, {"Units Sold", "Discount"}
+    ),
+    FilterRows = Table.SelectRows(
+        ReplaceNulls, each ([Units Sold] > 0 and [Sales Price] > 0)
+    ),
+    RemoveDup = Table.Distinct(FilterRows, {"SK_ID"}),
+    AddSalesAmount = Table.AddColumn(
+        RemoveDup, "SalesAmount", each [Units Sold] * [Sales Price], type number
+    ),
+    Trimmed = Table.TransformColumns(AddSalesAmount, {
+        {"Produto", Text.Trim, type text},
+        {"Discount Band", Text.Trim, type text},
+        {"Segment", Text.Trim, type text},
+        {"Country", Text.Trim, type text},
+        {"Saler", Text.Trim, type text}
+    })
+in
+    Trimmed
+
+
+# ================================================================
+# 2️⃣ F_Vendas — Tabela fato consolidada
+# ================================================================
+
+let
+    Fonte = Financials_origem,
+    SelectCols = Table.SelectColumns(Fonte, {
+        "SK_ID", "ID_produto", "Produto", "Date", "Units Sold", "Sales Price",
+        "Manufacturing Price", "Discount", "Discount Band",
+        "Segment", "Country", "Saler", "Profit", "SalesAmount"
+    }),
+    Renamed = Table.RenameColumns(SelectCols, {
+        {"Units Sold", "Units_Sold"},
+        {"Sales Price", "Sales_Price"},
+        {"Manufacturing Price", "Manufacturing_Price"},
+        {"Discount Band", "Discount_Band"}
+    }),
+    ChangedTypes = Table.TransformColumnTypes(Renamed, {
+        {"SK_ID", Int64.Type},
+        {"ID_produto", type text},
+        {"Produto", type text},
+        {"Date", type date},
+        {"Units_Sold", Int64.Type},
+        {"Sales_Price", type number},
+        {"Manufacturing_Price", type number},
+        {"Discount", type number},
+        {"Discount_Band", type text},
+        {"Segment", type text},
+        {"Country", type text},
+        {"Saler", type text},
+        {"Profit", type number},
+        {"SalesAmount", type number}
+    })
+in
+    ChangedTypes
+
+
+# ================================================================
+# 3️⃣ D_Produtos — Dimensão agregada de produtos
+# ================================================================
+
+let
+    Fonte = Financials_origem,
+    SelectCols = Table.SelectColumns(Fonte, {"ID_produto", "Produto", "Units Sold", "Sales Price"}),
+    Grouped = Table.Group(SelectCols, {"ID_produto", "Produto"}, {
+        {"Avg_Units", each List.Average([Units Sold]), type nullable number},
+        {"Avg_SalesPrice", each List.Average([Sales Price]), type nullable number},
+        {"Median_SalesPrice", each List.Median([Sales Price]), type nullable number},
+        {"Max_SalesPrice", each List.Max([Sales Price]), type nullable number},
+        {"Min_SalesPrice", each List.Min([Sales Price]), type nullable number},
+        {"CountTransactions", each List.Count([Sales Price]), Int64.Type}
+    }),
+    Renamed = Table.RenameColumns(Grouped, {
+        {"ID_produto", "ID_Produto"},
+        {"Produto", "Produto"}
+    })
+in
+    Renamed
+
+
+# ================================================================
+# 4️⃣ D_Produtos_Detalhes — Detalhes por produto e faixa de desconto
+# ================================================================
+
+let
+    Fonte = Financials_origem,
+    SelectCols = Table.SelectColumns(Fonte, {
+        "ID_produto", "Produto", "Discount Band", "Sales Price", "Units Sold", "Manufacturing Price"
+    }),
+    Renamed = Table.RenameColumns(SelectCols, {
+        {"Discount Band", "Discount_Band"},
+        {"Manufacturing Price", "Manufacturing_Price"},
+        {"Units Sold", "Units_Sold"}
+    }),
+    RemovedDuplicates = Table.Distinct(Renamed)
+in
+    RemovedDuplicates
+
+
+# ================================================================
+# 5️⃣ D_Descontos — Tabela de faixas e médias de desconto
+# ================================================================
+
+let
+    Fonte = Financials_origem,
+    SelectCols = Table.SelectColumns(Fonte, {"ID_produto", "Discount", "Discount Band"}),
+    Renamed = Table.RenameColumns(SelectCols, {{"Discount Band", "Discount_Band"}}),
+    Grouped = Table.Group(Renamed, {"Discount_Band"}, {
+        {"Avg_Discount", each List.Average([Discount]), type nullable number},
+        {"Min_Discount", each List.Min([Discount]), type nullable number},
+        {"Max_Discount", each List.Max([Discount]), type nullable number},
+        {"CountProducts", each List.Count([ID_produto]), Int64.Type}
+    })
+in
+    Grouped
+
+
+# ================================================================
+# 6️⃣ D_Detalhes — Vendedores, segmentos e países
+# ================================================================
+
+let
+    Fonte = Financials_origem,
+    SelectCols = Table.SelectColumns(Fonte, {"Saler", "Segment", "Country"}),
+    RemovedDup = Table.Distinct(SelectCols),
+    Renamed = Table.TransformColumnTypes(RemovedDup, {
+        {"Saler", type text},
+        {"Segment", type text},
+        {"Country", type text}
+    })
+in
+    Renamed
+
+
+# ================================================================
+# ⚙️ Observações Gerais
+# ================================================================
+# - Todos os códigos acima devem ser criados como Queries no Power Query Editor.
+# - As referências (Reference) devem apontar para Financials_origem (já limpa).
+# - Cada Query deve ser nomeada conforme descrito:
+#     Financials_origem, F_Vendas, D_Produtos, D_Produtos_Detalhes, D_Descontos, D_Detalhes.
+# - Após aplicar todas as etapas, carregar todas (exceto Financials_origem) no Modelo.
+# - Criar a tabela D_Calendario via DAX no modelo com CALENDAR().
+# ================================================================ 
+
+
+
+
+--- 
+
+
+Como usar
+
+1. No Power BI Desktop → Transformar Dados → Editor Avançado.
+
+
+2. Copie o conteúdo de cada bloco let ... in e crie consultas com os nomes correspondentes. 
+
+
+
