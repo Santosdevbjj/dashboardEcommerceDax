@@ -18,7 +18,6 @@ Este projeto foi desenvolvido como desafio de modelagem e análise de dados no P
 
 A base de dados utilizada foi a amostra **Financial Sample**, com o objetivo de criar **tabelas dimensão e fato** para um cenário simulado de **E-commerce**, possibilitando análises dinâmicas de vendas, produtos, lucros e descontos.
 
-O projeto está totalmente documentado e preparado para ser exibido no GitHub como portfólio técnico profissional.
 
 ---
 
