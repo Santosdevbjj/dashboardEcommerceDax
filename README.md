@@ -1,482 +1,249 @@
-## Modelando um Dashboard de E-commerce com Power BI Utilizando Fórmulas DAX.
+# 🛒 Dashboard de E-commerce — Star Schema + DAX + Power BI
 
+<img width="1080" height="713" alt="Screenshot_20251101-191239" src="https://github.com/user-attachments/assets/a0a6d027-6a8e-4bbb-a082-68f71954d516" />
 
-<img width="1080" height="713" alt="Screenshot_20251101-191239" src="https://github.com/user-attachments/assets/a0a6d027-6a8e-4bab-a082-68f71954d516" />
-
-
----
-
-# 🛒 Dashboard de E-commerce — Power BI + DAX + Star Schema
-
-**Tecnologias:** Power BI Desktop • Power Query (M) • DAX • GitHub  
+**Modelagem Dimensional e Análise com Power BI**
 
 ---
 
-## 📘 Descrição do Projeto
+## 1. Problema de Negócio
 
-Este projeto foi desenvolvido como desafio de modelagem e análise de dados no Power BI, aplicando conceitos de **modelagem dimensional (Star Schema)** e **fórmulas DAX avançadas** para criação de medidas, colunas calculadas e tabelas derivadas.
+Um arquivo CSV com dados transacionais de vendas responde uma pergunta por vez — e apenas para quem sabe escrever uma fórmula. Para qualquer outra área da empresa, esses dados são invisíveis.
 
-A base de dados utilizada foi a amostra **Financial Sample**, com o objetivo de criar **tabelas dimensão e fato** para um cenário simulado de **E-commerce**, possibilitando análises dinâmicas de vendas, produtos, lucros e descontos.
+O problema real de um e-commerce é mais específico: **como responder simultaneamente perguntas como "qual produto tem a maior margem de lucro?", "como crescemos em relação ao ano anterior?" e "quais segmentos geram mais desconto?" — de forma dinâmica, sem depender de um analista de plantão para cada consulta?**
 
+A resposta exige sair do dado bruto e construir um modelo analítico. Não basta importar uma planilha no Power BI — é preciso modelar dimensões, criar uma tabela fato coerente, estabelecer uma tabela de calendário e escrever medidas DAX que respondam perguntas de negócio com precisão e performance.
+
+Este projeto faz exatamente isso: transforma a base **Financial Sample** — uma planilha plana de transações comerciais — em um modelo dimensional completo capaz de alimentar um dashboard corporativo interativo.
 
 ---
 
-## 🧱 Estrutura do Repositório
+## 2. Contexto
 
-```bash
-/dashboardEcommerceDax/
-├── README.md                              # Documentação principal (este arquivo)
-├── /data/
-│   └── financial_sample.csv               # Base de dados original (Financial Sample)
-├── /powerbi/
-│   └── dashboardEcommerce.pbix            # Arquivo Power BI com modelo, DAX e relatórios
-├── /docs/
-│   ├── ER_diagram.png                     # Diagrama do modelo em estrela
-│   ├── dax_formulas.md                    # Fórmulas DAX utilizadas no projeto
-│   ├── process.md                         # Descrição do processo de modelagem e transformação
-│   └── requirements.md                    # Requisitos de hardware e software
-├── /images/
-│   ├── overview_kpis.png                  # Página principal do dashboard
-│   └── product_analysis.png               # Página de análise de produtos
-└── /src/
-    ├── etl_export_sql.sql                 # (Opcional) Script SQL auxiliar de extração
-    └── powerquery_steps.txt               # Passos M exportados do Power Query.
+Este projeto foi desenvolvido como desafio de modelagem e análise de dados no **Bootcamp NTT DATA**, com foco em modelagem dimensional (Star Schema) e DAX aplicado a cenários reais de e-commerce.
 
+A base **Financial Sample** simula as operações de vendas de uma empresa com múltiplos produtos, segmentos de clientes, países e canais de distribuição. Os dados incluem preço de venda, unidades vendidas, custo de manufatura, desconto por faixa e lucro por transação — todos armazenados de forma desnormalizada em uma única tabela plana.
+
+O desafio técnico foi duplo: primeiro, **modelar esses dados em um esquema dimensional** (Star Schema) que separasse fatos de dimensões e viabilizasse análises cruzadas. Segundo, **escrever medidas DAX** que fossem além de somas simples — calculando margens, rankings dinâmicos, crescimento anual (YoY) e classificações inteligentes de produtos por faixa de preço.
+
+O resultado é um dashboard de quatro páginas navegáveis, com KPIs interativos, filtros por dimensão e análises temporais por mês, trimestre e ano.
+
+---
+
+## 3. Premissas da Modelagem
+
+Para a construção do modelo analítico, as seguintes premissas foram adotadas:
+
+- **Fonte única e imutável:** a tabela `Financials_origem` é mantida como backup oculto no modelo. Todas as tabelas dimensão e fato são derivadas dela — nenhuma transformação altera a origem.
+- **Star Schema como padrão arquitetural:** a tabela fato `F_Vendas` contém apenas métricas e chaves estrangeiras. Atributos descritivos pertencem exclusivamente às dimensões — eliminando ambiguidade e garantindo que os filtros se propaguem corretamente.
+- **D_Calendario gerada via DAX:** a tabela de calendário é construída dinamicamente com `CALENDAR()` entre a menor e a maior data presente nos dados — garantindo que nenhuma data fique descoberta, independentemente do intervalo da base.
+- **Medidas calculadas, não colunas:** KPIs como `Total Sales`, `Profit Margin %` e `YoY Growth %` são medidas DAX, não colunas calculadas. Isso garante que respondam corretamente ao contexto de filtro do relatório em tempo de execução.
+- **`DIVIDE` em vez de divisão direta:** todas as divisões usam `DIVIDE(numerador, denominador, 0)` para evitar erros quando o denominador é zero — padrão de robustez para medidas financeiras.
+
+---
+
+## 4. Estratégia da Solução
+
+A construção seguiu um pipeline estruturado em seis etapas:
+
+**Etapa 1 — Importação e proteção da origem**
+O arquivo `financial_sample.csv` foi importado no Power BI e renomeado para `Financials_origem`. A consulta foi ocultada no modelo para que nunca seja usada diretamente em visuais — apenas como fonte das demais tabelas. Esse padrão garante rastreabilidade: qualquer alteração futura na origem pode ser inspecionada sem risco de corromper o modelo.
+
+**Etapa 2 — Limpeza e transformação no Power Query**
+Padronização de tipos de dados (decimal para preços e lucro, date para datas), normalização dos nomes de colunas e remoção de registros inconsistentes. Criação de `ID_produto` como chave de relacionamento entre as tabelas.
+
+**Etapa 3 — Modelagem dimensional (DAX)**
+Construção das cinco tabelas do modelo via DAX:
+- `D_Produtos` com `SUMMARIZE + ADDCOLUMNS` — estatísticas agregadas por produto (média, mediana, máximo e mínimo de preço de venda)
+- `D_Produtos_Detalhes` com `SUMMARIZE` — atributos individuais de preço, unidades e custo de manufatura
+- `D_Descontos` com `SUMMARIZE` — faixas e valores de desconto por produto
+- `D_Calendario` com `ADDCOLUMNS(CALENDAR(...))` — dimensão temporal com ano, mês, trimestre, semana e número do mês para ordenação
+- `F_Vendas` com `SELECTCOLUMNS` — tabela fato limpa com apenas as colunas necessárias para análise
+
+**Etapa 4 — Relacionamentos e cardinalidades**
+Relacionamentos definidos entre `F_Vendas` e cada dimensão, com verificação de cardinalidade (1:N) e direção de filtro (dimensão → fato). A `D_Calendario` foi marcada como tabela de datas para habilitar funções de inteligência de tempo no DAX.
+
+**Etapa 5 — Medidas DAX**
+Onze medidas implementadas cobrindo vendas, lucro, margem, mediana, ranking, crescimento anual e análise de desconto. As medidas mais sofisticadas usam os padrões `VAR/RETURN` para legibilidade e `TOPN + SELECTEDVALUE` para análises dinâmicas de Top N produtos.
+
+**Etapa 6 — Design do Dashboard**
+Quatro páginas navegáveis construídas com os dados do modelo: Visão Geral com KPIs principais, Análise de Produtos com ranking e classificação, Tendência Temporal com crescimento mês a mês e ano a ano, e Tabela de Detalhes com filtros interativos por país, segmento e faixa de desconto.
+
+---
+
+## 5. Decisões Técnicas
+
+**Por que Star Schema e não uma tabela plana?**
+Uma tabela plana — como o CSV original — funciona para análises simples, mas quebra quando as perguntas se tornam cruzadas. "Qual a margem por produto em cada país, filtrando apenas clientes Premium?" exige que filtros se propaguem corretamente entre entidades distintas. O Star Schema foi a única estrutura que viabilizou isso sem criar medidas com lógica condicional complexa para compensar um modelo ruim.
+
+**Por que `ADDCOLUMNS + SUMMARIZE` para `D_Produtos` em vez de Power Query?**
+O Power Query resolve bem transformações de linha, mas agregar estatísticas por grupo (média, mediana, máximo por produto) é muito mais natural e eficiente em DAX — que opera diretamente sobre o modelo relacional já carregado. Além disso, manter a lógica de agregação em DAX permite que a dimensão responda a alterações no modelo sem refazer o ETL.
+
+**Por que `MEDIANX` em vez de `MEDIAN`?**
+`MEDIAN` opera sobre uma coluna inteira. `MEDIANX` itera linha a linha sobre um contexto específico — neste caso, sobre os valores únicos de `SK_ID` — garantindo que a mediana seja calculada corretamente quando há filtros ativos no relatório, evitando o erro clássico de mediana ignorar o contexto de linha.
+
+**Por que `RANKX(ALL(...), ..., , DESC, DENSE)`?**
+O argumento `ALL(D_Produtos)` remove qualquer filtro ativo na dimensão de produtos antes de calcular o ranking — garantindo que o produto sempre seja ranqueado em relação a todos os outros, independentemente dos filtros do relatório. `DENSE` elimina lacunas na sequência quando produtos empatam.
+
+**Por que `VAR/RETURN` no `YoY Growth %`?**
+O padrão `VAR/RETURN` não é apenas estético — ele armazena o resultado intermediário de `[Total Sales]` e `DATEADD(...)` em variáveis, evitando que o motor DAX avalie a mesma expressão duas vezes. Em modelos com alto volume de dados, isso tem impacto direto na performance de renderização do relatório.
+
+**O que eu faria diferente hoje?**
+Publicaria o modelo no **Power BI Service** com atualização incremental configurada e criaria um **parâmetro de What-If** para simular cenários de margem — por exemplo, "o que acontece com o lucro total se reduzirmos o desconto médio em 5%?". Também implementaria **RLS (Row-Level Security)** para controlar o acesso por país ou segmento de cliente.
+
+---
+
+## 6. Insights do Desenvolvimento
+
+Durante a construção do projeto, ficou evidente que:
+
+- **O modelo é mais importante que o visual.** Um dashboard bonito sobre um modelo ruim produz respostas erradas de forma elegante. A decisão de construir o Star Schema antes de criar qualquer visual foi o que garantiu que todas as métricas respondessem corretamente aos filtros — incluindo os cruzamentos mais complexos entre produto, país e período.
+- **`D_Calendario` é indispensável para inteligência de tempo.** Sem uma tabela de datas marcada como tal, funções como `DATEADD` e `SAMEPERIODLASTYEAR` não funcionam. O `YoY Growth %` só foi possível porque a `D_Calendario` foi criada e configurada corretamente — não apenas importada.
+- **`SWITCH(TRUE(), ...)` é o padrão correto para classificações condicionais.** O `Product Index` classifica produtos em Low, Medium, High e Premium com base no preço médio. Usar `IF` aninhados produziria o mesmo resultado, mas com legibilidade zero. `SWITCH(TRUE(), ...)` torna a intenção explícita e o código auditável.
+- **Backup de origem é uma prática de governança, não de paranoia.** Manter `Financials_origem` oculta no modelo permite rastrear a origem de qualquer valor em qualquer tabela derivada. Em projetos reais com múltiplas fontes e atualizações frequentes, essa prática evita horas de diagnóstico quando um número "muda sozinho".
+
+---
+
+## 7. Resultados
+
+Com o modelo completo implementado, o projeto entrega:
+
+- ✅ Star Schema com 4 dimensões + 1 tabela fato totalmente relacionadas e auditáveis
+- ✅ 11 medidas DAX cobrindo vendas, lucro, margem, mediana, ranking, Top N dinâmico e crescimento anual (YoY)
+- ✅ Dashboard de 4 páginas interativas com KPIs, rankings, tendências temporais e tabela de detalhes com filtros cruzados
+- ✅ Classificação dinâmica de produtos por faixa de preço (`Product Index`) e ranking por receita (`Product Rank`)
+- ✅ Análise de crescimento anual de vendas (YoY) habilitada pela `D_Calendario` com inteligência de tempo
+
+---
+
+## 8. Próximos Passos
+
+- [ ] Publicar no **Power BI Service** com atualização agendada e compartilhamento via link
+- [ ] Implementar **parâmetro What-If** para simulação de cenários de desconto e margem
+- [ ] Adicionar **RLS (Row-Level Security)** para controle de acesso por país ou segmento
+- [ ] Criar página de **Análise de Cohort** — comportamento de recompra por segmento ao longo do tempo
+- [ ] Conectar a uma fonte de dados dinâmica (Azure SQL ou SharePoint) para substituir o CSV estático
+
+---
+
+## 🛠️ Tecnologias Utilizadas
+
+| Tecnologia | Finalidade |
+|---|---|
+| Power BI Desktop | Modelagem dimensional, DAX e design do dashboard |
+| Power Query (M) | ETL — limpeza, tipagem e transformação dos dados |
+| DAX | Tabelas calculadas, colunas e medidas dinâmicas |
+| Git + GitHub | Versionamento e documentação do projeto |
+
+---
+
+## 🧮 Modelo Dimensional — Star Schema
 
 ```
----
-
----
-
-🎯 **Objetivo Técnico**
-
-Modelar o conjunto de dados Financial Sample para obter um modelo de dados analítico otimizado, criando tabelas dimensão e fato e aplicando medidas DAX para calcular métricas como:
-
-**Total de Vendas**
-
-Quantidade de Unidades Vendidas
-
-Margem de Lucro (%)
-
-Preço Médio e Mediano
-
-Índice de Produto
-
-Rankings de Produtos
-
----
-
-
-🧮 **Estrutura do Modelo de Dados**
-
-O modelo segue o padrão Star Schema (Esquema em Estrela):
-
-<img width="988" height="736" alt="Screenshot_20251101-185807" src="https://github.com/user-attachments/assets/7c76415f-1a77-4ca6-a50a-24fe56df6d2f" />
-
----
-
-**Tabelas criadas:**
-
-Tipo	Nome da Tabela	Descrição
-
-Backup	Financials_origem	Tabela original, mantida oculta no modelo
-Dimensão	D_Produtos	Dados agregados por produto
-Dimensão	D_Produtos_Detalhes	Detalhes individuais (preço, unidades, manufatura)
-Dimensão	D_Descontos	Descontos e faixas
-Dimensão	D_Calendario	Gerada via DAX com CALENDAR()
-Fato	F_Vendas	Fato consolidado de vendas e lucros
-
-
-
----
-
-⚙️ **Etapas de Construção**
-
-1. Importação e backup da base
-
-Importar financial_sample.csv
-
-Renomear consulta para Financials_origem e ocultar no modelo.
-
-
-
-**2. Limpeza e transformação (Power Query)**
-
-Padronizar tipos de dados.
-
-Remover nulos e valores inconsistentes.
-
-Normalizar nomes de colunas.
-
-
-
-**3. Criação das tabelas dimensão e fato (DAX / Power Query)**
-
-Usar SUMMARIZE e ADDCOLUMNS para construir tabelas agregadas.
-
-Criar D_Calendario com CALENDAR() entre o menor e o maior valor de data.
-
-
-
-**4. Modelagem relacional**
-
-Relacionar F_Vendas às dimensões.
-
-Verificar cardinalidades e direções de filtro.
-
-
-
-**5. Criação das medidas DAX**
-
-Implementar cálculos de vendas, lucro e margem.
-
-Criar índices e classificações com SWITCH, RANKX, IF.
-
-
-
-**6. Design do Dashboard**
-
-Página 1: Visão Geral (KPIs)
-
-Página 2: Análise de Produtos
-
-Página 3: Tendência Temporal (Gráficos por Mês/Ano)
-
-Página 4: Tabela de Detalhes (Filtros Interativos)
-
-
-
-
-
----
-
-🧠 **Principais Fórmulas DAX Utilizadas**
-
-Consulte o arquivo completo: /docs/dax_formulas.md
-
-**Exemplo de medida:**
-
-Total Sales = 
-SUMX(F_Vendas, F_Vendas[SalesPrice] * F_Vendas[UnitsSold])
-
-**Exemplo de tabela calculada:**
-
-D_Calendario =
-ADDCOLUMNS(
-    CALENDAR(MIN(F_Vendas[Date]), MAX(F_Vendas[Date])),
-    "Ano", YEAR([Date]),
-    "Mês", FORMAT([Date], "MMMM"),
-    "Trimestre", "T" & FORMAT([Date], "Q")
-)
-
-
----
-
-🧰 **Tecnologias e Ferramentas**
-
-**Tecnologia	Uso**
-
-Power BI Desktop	Modelagem de dados e criação de relatórios
-Power Query (M)	ETL — limpeza e transformação de dados
-DAX	Cálculos e medidas dinâmicas
-Git / GitHub	Versionamento e documentação do projeto
-
-
-
----
-
-💻 **Requisitos de Sistema**
-
-**Software:**
-
-Power BI Desktop (versão 2023 ou superior)
-
-Windows 10/11
-
-Git (para versionamento)
-
-
-**Hardware recomendado:**
-
-CPU: Intel i5 ou superior
-
-RAM: 8 GB (mínimo) / 16 GB (ideal)
-
-Armazenamento: 10 GB livres
-
-
-
----
-
-📊 **Resultados Esperados**
-
-Modelo relacional limpo, otimizado e documentado.
-
-Dashboard interativo com filtros, KPIs e análises visuais.
-
-Utilização de funções DAX como CALCULATE, SUMMARIZE, ADDCOLUMNS, MEDIANX, RANKX e SWITCH.
-
-README estruturado para atrair recrutadores e avaliadores técnicos.
-
-
-
----
-
-
-
-## 📘 **(2) `/docs/dax_formulas.md` — todas as fórmulas DAX completas e comentadas**
-
-> Caminho no GitHub:  
-> `/docs/dax_formulas.md`
-
----
-
-```markdown
-# 📘 DAX Formulas — Dashboard E-commerce (Power BI)
-
-Este arquivo documenta todas as **tabelas calculadas**, **colunas** e **medidas DAX** utilizadas no projeto **Dashboard E-commerce com Power BI**.
-
----
+                    D_Calendario
+                        │
+          D_Descontos ──┤
+                        │
+D_Produtos_Detalhes ────┼──── F_Vendas (tabela fato)
+                        │
+              D_Produtos─┘
 ```
 
-## 🧱 Tabelas Calculadas
+| Tipo | Tabela | Descrição |
+|---|---|---|
+| Backup | `Financials_origem` | Tabela original, mantida oculta — fonte de todas as demais |
+| Dimensão | `D_Produtos` | Estatísticas agregadas por produto (média, mediana, máx, mín) |
+| Dimensão | `D_Produtos_Detalhes` | Atributos individuais: preço, unidades, custo de manufatura |
+| Dimensão | `D_Descontos` | Faixas e valores de desconto por produto |
+| Dimensão | `D_Calendario` | Gerada via `ADDCOLUMNS(CALENDAR(...))` com ano, mês, trimestre e semana |
+| Fato | `F_Vendas` | Transações consolidadas: vendas, lucro, unidades, segmento e país |
 
-### 1️⃣ D_Produtos
-Resumo e estatísticas por produto.
+---
+
+## 🧠 Medidas DAX Implementadas
 
 ```dax
-D_Produtos =
-ADDCOLUMNS(
-    SUMMARIZE(
-        Financials_origem,
-        Financials_origem[ID_produto],
-        Financials_origem[Produto]
-    ),
-    "Média Unidades", CALCULATE(AVERAGE(Financials_origem[Units Sold])),
-    "Média Vendas", CALCULATE(AVERAGE(Financials_origem[Sales Price])),
-    "Mediana Vendas", CALCULATE(MEDIAN(Financials_origem[Sales Price])),
-    "Máximo Venda", CALCULATE(MAX(Financials_origem[Sales Price])),
-    "Mínimo Venda", CALCULATE(MIN(Financials_origem[Sales Price]))
-)
+-- Total de vendas (SUMX para contexto de linha correto)
+Total Sales = SUMX(F_Vendas, F_Vendas[SalesPrice] * F_Vendas[UnitsSold])
 
+-- Margem de lucro com proteção contra divisão por zero
+Profit Margin % = DIVIDE([Total Profit], [Total Sales], 0)
 
----
-```
-
-2️⃣ **D_Produtos_Detalhes**
-
-D_Produtos_Detalhes =
-SUMMARIZE(
-    Financials_origem,
-    Financials_origem[ID_produto],
-    Financials_origem[Discount Band],
-    Financials_origem[Sales Price],
-    Financials_origem[Units Sold],
-    Financials_origem[Manufacturing Price]
-)
-
-
----
-
-3️⃣ **D_Descontos**
-
-D_Descontos =
-SUMMARIZE(
-    Financials_origem,
-    Financials_origem[ID_produto],
-    Financials_origem[Discount],
-    Financials_origem[Discount Band]
-)
-
-
----
-
-4️⃣ **D_Calendario**
-
-D_Calendario =
-ADDCOLUMNS(
-    CALENDAR(MIN(Financials_origem[Date]), MAX(Financials_origem[Date])),
-    "Ano", YEAR([Date]),
-    "Mês", FORMAT([Date], "MMMM"),
-    "Trimestre", "T" & FORMAT([Date], "Q"),
-    "Ano-Mês", FORMAT([Date], "YYYY-MM"),
-    "Dia", DAY([Date]),
-    "MêsNum", MONTH([Date]),
-    "SemanaAno", WEEKNUM([Date])
-)
-
-
----
-
-5️⃣ **F_Vendas**
-
-F_Vendas =
-SELECTCOLUMNS(
-    Financials_origem,
-    "SK_ID", Financials_origem[SK_ID],
-    "ID_Produto", Financials_origem[ID_produto],
-    "Produto", Financials_origem[Produto],
-    "UnitsSold", Financials_origem[Units Sold],
-    "SalesPrice", Financials_origem[Sales Price],
-    "DiscountBand", Financials_origem[Discount Band],
-    "Segment", Financials_origem[Segment],
-    "Country", Financials_origem[Country],
-    "Saler", Financials_origem[Saler],
-    "Profit", Financials_origem[Profit],
-    "Date", Financials_origem[Date]
-)
-
-
----
-
-📊 **Medidas DAX**
-
-Total Sales
-
-Total Sales = 
-SUMX(F_Vendas, F_Vendas[SalesPrice] * F_Vendas[UnitsSold])
-
-
----
-
-**Total Units Sold**
-
-Total Units Sold =
-SUM(F_Vendas[UnitsSold])
-
-
----
-
-**Average Sales Price**
-
-Average Sales Price =
-AVERAGE(F_Vendas[SalesPrice])
-
-
----
-
-**Median Sales Price**
-
-Median Sales Price =
-MEDIANX(VALUES(F_Vendas[SK_ID]), F_Vendas[SalesPrice])
-
-
----
-
-**Total Profit**
-
-Total Profit = SUM(F_Vendas[Profit])
-
-
----
-
-**Profit Margin %**
-
-Profit Margin % =
-DIVIDE([Total Profit], [Total Sales], 0)
-
-
----
-
-**Product Index (classificação de preço)**
-
-Product Index =
-SWITCH(
-    TRUE(),
-    [Average Sales Price] >= 1000, "Premium",
-    [Average Sales Price] >= 500, "High",
-    [Average Sales Price] >= 100, "Medium",
-    "Low"
-)
-
-
----
-
-**Product Rank (ranking por valor médio)**
-
-Product Rank =
-RANKX(ALL(D_Produtos), [Average Sales Price], , DESC, DENSE)
-
-
----
-
-**Top N Products (dinâmico)**
-
-Top N Sales =
-VAR N = SELECTEDVALUE(Parameters[TopN], 10)
-RETURN
-CALCULATE(
-    [Total Sales],
-    TOPN(N, VALUES(D_Produtos[ID_Produto]), [Total Sales], DESC)
-)
-
-
----
-
-**YoY Growth (Crescimento Anual de Vendas)**
-
+-- Crescimento anual com padrão VAR/RETURN
 YoY Growth % =
 VAR CurrYear = [Total Sales]
 VAR PrevYear = CALCULATE([Total Sales], DATEADD(D_Calendario[Date], -1, YEAR))
 RETURN DIVIDE(CurrYear - PrevYear, PrevYear, 0)
 
-
----
-
-**Average Discount %**
-
-Average Discount % =
-AVERAGE(F_Vendas[Discount])
-
-
----
-
-**Sales per Country**
-
-Sales per Country =
-SUMMARIZE(
-    F_Vendas,
-    F_Vendas[Country],
-    "TotalSales", [Total Sales],
-    "Profit", [Total Profit]
+-- Classificação dinâmica por faixa de preço
+Product Index =
+SWITCH(
+    TRUE(),
+    [Average Sales Price] >= 1000, "Premium",
+    [Average Sales Price] >= 500,  "High",
+    [Average Sales Price] >= 100,  "Medium",
+    "Low"
 )
 
+-- Ranking por receita média, removendo filtros do contexto
+Product Rank = RANKX(ALL(D_Produtos), [Average Sales Price], , DESC, DENSE)
+
+-- Top N dinâmico via parâmetro selecionável
+Top N Sales =
+VAR N = SELECTEDVALUE(Parameters[TopN], 10)
+RETURN CALCULATE([Total Sales], TOPN(N, VALUES(D_Produtos[ID_Produto]), [Total Sales], DESC))
+```
+
+> Todas as fórmulas completas e comentadas estão em [`/docs/dax_formulas.md`](docs/dax_formulas.md)
 
 ---
 
-📈 **DAX Tips**
+## 📂 Estrutura do Repositório
 
-**Use CALCULATE** para alterar o contexto de filtro.
-
-**SUMMARIZE** cria contextos de agrupamento.
-
-**ADDCOLUMNS** adiciona métricas a um contexto existente.
-
-**DIVIDE** evita erros de divisão por zero.
-
-**SWITCH e RANKX** permitem criar classificações inteligentes.
-
-
-
----
-
-📘 **Autor:** Sérgio Santos
-💡 Projeto: Dashboard de E-commerce — Modelagem DAX com Power BI
-
-
----
-
-**Contato:**
-
-
-[![Portfólio Sérgio Santos](https://img.shields.io/badge/Portfólio-Sérgio_Santos-111827?style=for-the-badge&logo=githubpages&logoColor=00eaff)](https://portfoliosantossergio.vercel.app)
-
-[![LinkedIn Sérgio Santos](https://img.shields.io/badge/LinkedIn-Sérgio_Santos-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://linkedin.com/in/santossergioluiz)
-
-
+```
+dashboardEcommerceDax/
+├── data/
+│   └── financial_sample.csv              # Base de dados original (Financial Sample)
+├── powerbi/
+│   └── dashboardEcommerce.pbix           # Arquivo Power BI com modelo, DAX e relatórios
+├── docs/
+│   ├── ER_diagram.png                    # Diagrama do Star Schema
+│   ├── dax_formulas.md                   # Todas as fórmulas DAX documentadas e comentadas
+│   ├── process.md                        # Descrição do processo de modelagem e ETL
+│   └── requirements.md                   # Requisitos de hardware e software
+├── images/
+│   ├── overview_kpis.png                 # Página 1 — Visão Geral (KPIs)
+│   └── product_analysis.png              # Página 2 — Análise de Produtos
+└── src/
+    ├── etl_export_sql.sql                # Script SQL auxiliar de extração (opcional)
+    └── powerquery_steps.txt              # Passos M exportados do Power Query
+```
 
 ---
 
+## ▶️ Como Abrir o Projeto
 
+**Pré-requisitos:** Power BI Desktop 2023 ou superior, Windows 10/11
 
+1. Clone o repositório:
+```bash
+git clone https://github.com/Santosdevbjj/dashboardEcommerceDax.git
+```
+2. Abra o arquivo `powerbi/dashboardEcommerce.pbix` no Power BI Desktop
+3. Se necessário, atualize o caminho da fonte de dados apontando para `data/financial_sample.csv`
+4. Clique em **Atualizar** para recarregar os dados e renderizar o dashboard
 
+---
+
+## 📄 Licença
+
+Este projeto está licenciado sob a **MIT License** — consulte o arquivo [LICENSE](LICENSE) para mais detalhes.
+
+---
+
+## Autor
+
+**Sergio Santos**
+
+[![Portfólio](https://img.shields.io/badge/Portfólio-Sérgio_Santos-111827?style=for-the-badge&logo=githubpages&logoColor=00eaff)](https://portfoliosantossergio.vercel.app)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Sérgio_Santos-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://linkedin.com/in/santossergioluiz)
