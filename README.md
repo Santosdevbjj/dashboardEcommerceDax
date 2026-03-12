@@ -1,6 +1,7 @@
 # 🛒 Dashboard de E-commerce — Star Schema + DAX + Power BI
 
-<img width="1080" height="713" alt="Screenshot_20251101-191239" src="https://github.com/user-attachments/assets/a0a6d027-6a8e-4bbb-a082-68f71954d516" />
+<img width="1080" height="696" alt="Screenshot_20260311-222319" src="https://github.com/user-attachments/assets/0d6463eb-4cdd-469a-a1c5-568cd5d9aa6d" />
+
 
 
 **Modelagem Dimensional e Análise com Power BI**
